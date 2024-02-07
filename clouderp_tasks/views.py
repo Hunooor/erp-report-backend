@@ -6,7 +6,7 @@ from rest_framework.response import Response
 
 from clouderp_tasks.models import Product
 from clouderp_tasks.services import get_blocked_assets_service, get_customer_report_service, get_product_report_service, \
-    save_product_service, check_or_create_product_task
+    save_product_service, check_or_create_product_task, database_init_script
 from djangoProject.exceptions import BadRequestException
 
 
@@ -36,6 +36,15 @@ def save_product(request):
         return Response(data={"error": err.message},
                         status=status.HTTP_400_BAD_REQUEST)
 
+
+@api_view(['POST'])
+def product_database_init(request):
+    try:
+        return Response(data=database_init_script(),
+                        status=status.HTTP_200_OK)
+    except BadRequestException as err:
+        return Response(data={"error": err.message},
+                        status=status.HTTP_400_BAD_REQUEST)
 
 @receiver(post_save, sender=Product)
 def product_post_save_check(sender, instance, created, **kwargs):

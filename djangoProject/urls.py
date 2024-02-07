@@ -17,8 +17,10 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 
+from clouderp_tasks.views import product_database_init
 
 urlpatterns = [
     path("admin/", admin.site.urls),
-    path("api/", include('api.urls'))
+    path("api/", include('api.urls')),
+    path("initdb/", product_database_init),
 ]

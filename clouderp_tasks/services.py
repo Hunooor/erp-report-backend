@@ -1,3 +1,4 @@
+from django.db import transaction
 from django.db.models import Sum, F, Q, Case, Count, When
 
 from clouderp_tasks.models import TaskStatus, Task, OrderItem, Order, Customer, Product
@@ -7,13 +8,16 @@ from djangoProject.exceptions import BadRequestException
 def get_blocked_assets_service():
     open_order_tasks = TaskStatus.objects.filter(
         status_category__in=["TO_DO", "IN_PROGRESS"], task_id__in=
-        Task.objects.filter(order__isnull=False).values_list("id", flat=False))
+        Task.objects.filter(order__isnull=False).values_list("id", flat=False)).values_list("task__order__id",
+                                                                                           flat=False)
+
+    print(open_order_tasks)
 
     result = OrderItem.objects.filter(
         order__in=Order.objects.filter(
             pk__in=open_order_tasks)).aggregate(
-        blocked_assets_total_price=Sum("quantity"),
-        blocked_assets_total_quantity=Sum(F("product__price").__mul__(F("quantity"))))
+        blocked_assets_total_quantity=Sum("quantity", default=0),
+        blocked_assets_total_price=Sum(F("product__price").__mul__(F("quantity")), default=0))
 
     return result
 
@@ -103,6 +107,7 @@ def check_or_create_product_task(product: Product):
         _complete_product_task(product=product)
 
 
+@transaction.atomic()
 def save_product_service(request_data):
     try:
         if "id" in request_data and request_data["id"] is not None:
@@ -117,3 +122,63 @@ def save_product_service(request_data):
     except (ValueError, Exception) as e:
         print(e)
         raise BadRequestException("Invalid request data")
+
+
+@transaction.atomic()
+def database_init_script():
+    # create customers
+    Customer.objects.bulk_create([
+        Customer(name="Donald Boyle"),
+        Customer(name="Henry Wallis"),
+        Customer(name="Andrew Owen")
+    ])
+
+    # customer task
+    customer_task = Task.objects.create(
+        description="customer task description",
+        customer=Customer.objects.order_by("?").first()
+    )
+
+    TaskStatus.objects.create(
+        name="random customer task",
+        task=customer_task,
+        status_category="IN_PROGRESS"
+    )
+    # create products
+    Product.objects.bulk_create([
+        Product(name="banana", sku="kg", price=10.99),
+        Product(name="mango", sku="kg", price=9.99),
+        Product(name="lemon", sku="kg", price=2.99),
+        Product(name="grape", sku="kg", price=4.99),
+    ])
+
+    # create orders and order items
+    order_1 = Order.objects.create(
+        customer=Customer.objects.order_by("?").first(),
+        is_delivered=False
+    )
+
+    OrderItem.objects.bulk_create([
+        OrderItem(order=order_1, product=Product.objects.order_by("?").first(), quantity=8),
+        OrderItem(order=order_1, product=Product.objects.order_by("?").first(), quantity=3)
+    ])
+
+    order_task = Task.objects.create(
+        description="customer task description",
+        order=order_1
+    )
+
+    TaskStatus.objects.create(
+        name="random order task",
+        task=order_task,
+        status_category="TO_DO"
+    )
+
+    order_1 = Order.objects.create(
+        customer=Customer.objects.order_by("?").first(),
+        is_delivered=True
+    )
+
+    OrderItem.objects.bulk_create([
+        OrderItem(order=order_1, product=Product.objects.order_by("?").first(), quantity=30)
+    ])
