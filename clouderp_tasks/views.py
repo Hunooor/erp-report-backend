@@ -46,7 +46,8 @@ def product_database_init(request):
         return Response(data={"error": err.message},
                         status=status.HTTP_400_BAD_REQUEST)
 
-@receiver(post_save, sender=Product)
+
+@receiver(post_save, sender=Product)  # instead of a trigger
 def product_post_save_check(sender, instance, created, **kwargs):
     if created or not created:
         check_or_create_product_task(product=instance)
