@@ -1,0 +1,139 @@
+<div>
+  <div style="margin-bottom: 16px; border: 1px dashed gray">
+    <h2 style="padding-left: 8px">
+      Blocked orders
+    </h2>
+    <table>
+      <thead>
+      <tr>
+        <td>Total price</td>
+        <td>Total quantity</td>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+        <td id="blocked_assets_total_price">0</td>
+        <td id="blocked_assets_total_quantity">0</td>
+      </tr>
+      </tbody>
+    </table>
+  </div>
+  <div style="margin-bottom: 16px; border: 1px dashed gray">
+    <h2 style="padding-left: 8px">
+      Customer tasks
+    </h2>
+    <table>
+      <thead>
+      <tr>
+        <td colspan="4">
+          <form>
+            <input type="text" id="customer_filter_name" placeholder="Filter by name" />
+            <input type="checkbox" id="customer_filter_has_open_tasks" />
+            <label for="customer_filter_todo">Has tasks</label>
+            <button id="customer-submit" type="submit">Filter</button>
+          </form>
+        </td>
+      </tr>
+      </thead>
+      <thead>
+      <tr>
+        <td>Name</td>
+        <td>Todo</td>
+        <td>In-progress</td>
+        <td>Done</td>
+      </tr>
+      </thead>
+      <tbody id="customer_table">
+      <tr id="customer_0_row">
+        <td id="customer_0_row_name">...</td>
+        <td id="customer_0_row_todo">0</td>
+        <td id="customer_0_row_in_progress">0</td>
+        <td id="customer_0_row_done">0</td>
+      </tr>
+      </tbody>
+    </table>
+  </div>
+  <div style="margin-bottom: 16px; border: 1px dashed gray">
+    <h2 style="padding-left: 8px">
+      Products report
+    </h2>
+    <table>
+      <thead>
+      <tr>
+        <td>Invalid products</td>
+        <td>Total products</td>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+        <td id="invalid_products">0</td>
+        <td id="total_products">0</td>
+      </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+  document.getElementById('customer-submit').addEventListener('click', async (e) => {
+    e.preventDefault()
+    const filter = document.getElementById('customer_filter_name').value
+    const hasTasks = document.getElementById('customer_filter_has_open_tasks').checked
+    const url = new URLSearchParams(location.search)
+    if (filter) {
+      url.set('name', filter)
+    } else {
+      url.delete('name')
+    }
+    if (hasTasks) {
+      url.set('has_open_tasks', hasTasks)
+    } else {
+      url.delete('has_open_tasks')
+    }
+    location.search = url.toString()
+  })
+  document.getElementById('customer_filter_name').value = new URLSearchParams(location.search).get('name') || ''
+  document.getElementById('customer_filter_has_open_tasks').checked = new URLSearchParams(location.search).get('has_open_tasks') === 'true'
+
+  window.addEventListener('load', async () => {
+    const responses = await Promise.all([
+      fetch('/api/tasks/report/order'),
+      fetch('/api/tasks/report/customer' + location.search),
+      fetch('/api/tasks/report/product'),
+    ])
+
+    const [orderReport, customerReport, productReport] = await Promise.all(responses.map(r => r.json()))
+    document.getElementById('blocked_assets_total_price').innerText = orderReport.blocked_assets_total_price
+    document.getElementById('blocked_assets_total_quantity').innerText = orderReport.blocked_assets_total_quantity
+    document.getElementById('invalid_products').innerText = productReport.invalid_products
+    document.getElementById('total_products').innerText = productReport.total_products
+
+    const customerTable = document.getElementById('customer_table')
+    while (customerTable.firstChild) {
+      customerTable.removeChild(customerTable.firstChild)
+    }
+
+    for (const customer of customerReport.results) {
+      const row = document.createElement('tr')
+      row.id = `customer_${customer.id}_row`
+      const name = document.createElement('td')
+      name.id = `customer_${customer.id}_row_name`
+      name.innerText = customer.name
+      row.appendChild(name)
+      const todo = document.createElement('td')
+      todo.id = `customer_${customer.id}_row_todo`
+      todo.innerText = customer.todo
+      row.appendChild(todo)
+      const inProgress = document.createElement('td')
+      inProgress.id = `customer_${customer.id}_row_in_progress`
+      inProgress.innerText = customer.in_progress
+      row.appendChild(inProgress)
+      const done = document.createElement('td')
+      done.id = `customer_${customer.id}_row_done`
+      done.innerText = customer.done
+      row.appendChild(done)
+      customerTable.appendChild(row)
+    }
+
+  })
+</script>
